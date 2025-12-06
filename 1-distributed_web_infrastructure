@@ -1,0 +1,285 @@
+# Distributed Web Infrastructure
+
+## Infrastructure Diagram
+
+```mermaid
+flowchart TB
+    User([User])
+    Internet((Internet))
+    DNS[DNS Server<br/>www.foobar.com<br/>→ Load Balancer IP]
+
+    LB[Load Balancer<br/>HAProxy<br/>Round Robin Algorithm]
+
+    subgraph Server1["Server 1"]
+        Web1[Web Server<br/>Nginx]
+        App1[Application Server]
+        Code1[Application Files<br/>Code Base]
+
+        Web1 --> App1
+        App1 --> Code1
+    end
+
+    subgraph Server2["Server 2"]
+        Web2[Web Server<br/>Nginx]
+        App2[Application Server]
+        Code2[Application Files<br/>Code Base]
+
+        Web2 --> App2
+        App2 --> Code2
+    end
+
+    subgraph DatabaseCluster["Database Cluster"]
+        DBPrimary[(Primary Node<br/>MySQL<br/>Read/Write)]
+        DBReplica[(Replica Node<br/>MySQL<br/>Read Only)]
+
+        DBPrimary -->|Replication| DBReplica
+    end
+
+    User -->|1. Request www.foobar.com| Internet
+    Internet --> DNS
+    DNS --> Internet
+    Internet -->|2. HTTP Request| LB
+    LB -->|3. Distribute| Web1
+    LB -->|3. Distribute| Web2
+    App1 --> DBPrimary
+    App1 --> DBReplica
+    App2 --> DBPrimary
+    App2 --> DBReplica
+```
+
+## Image URL
+[You can upload a screenshot of the above diagram to imgur and paste the link here]
+
+---
+
+## Why Are We Adding Each Element?
+
+### 1. Load Balancer (HAProxy)
+**Why added**: To distribute incoming traffic across multiple servers, preventing any single server from becoming overwhelmed. This improves:
+- **Availability**: If one server fails, the load balancer redirects traffic to healthy servers
+- **Performance**: Distributes workload, reducing response time
+- **Scalability**: Enables adding more servers as traffic grows
+- **Reliability**: Eliminates the single point of failure present in the simple stack
+
+### 2. Second Server (Server 2)
+**Why added**: To provide redundancy and increase capacity:
+- **Redundancy**: If Server 1 fails, Server 2 continues serving requests
+- **Load Sharing**: Both servers handle requests simultaneously, doubling the capacity
+- **High Availability**: Ensures the website remains accessible even during server failures or maintenance
+- **Performance**: Reduces load on individual servers, improving response times
+
+### 3. Database Replica (Replica Node)
+**Why added**: To improve database reliability and performance:
+- **Read Scalability**: Distributes read queries across Primary and Replica nodes
+- **Backup**: Provides a real-time backup of the database
+- **Disaster Recovery**: If Primary fails, Replica can be promoted
+- **Performance**: Reduces load on the Primary node by handling read queries
+
+---
+
+## Load Balancer Configuration
+
+### Distribution Algorithm: Round Robin
+
+**How Round Robin Works**:
+The Round Robin algorithm distributes requests sequentially across all available servers in a circular pattern.
+
+**Example**:
+- Request 1 → Server 1
+- Request 2 → Server 2
+- Request 3 → Server 1
+- Request 4 → Server 2
+- And so on...
+
+**Advantages**:
+- **Simple**: Easy to implement and understand
+- **Fair Distribution**: Each server receives equal number of requests
+- **No Server Preference**: Treats all servers equally
+
+**Disadvantages**:
+- **Ignores Server Load**: Doesn't consider current server load or capacity
+- **Ignores Response Time**: Doesn't account for server performance differences
+- **Session Persistence**: Requires additional configuration for sticky sessions
+
+**Alternative Algorithms**:
+- **Least Connections**: Sends requests to server with fewest active connections
+- **IP Hash**: Routes based on client IP for session persistence
+- **Weighted Round Robin**: Assigns more requests to more powerful servers
+
+---
+
+## Active-Active vs Active-Passive Setup
+
+### This Infrastructure: Active-Active
+
+**Active-Active Setup**:
+- **Definition**: All servers actively handle traffic simultaneously
+- **In this setup**: Both Server 1 and Server 2 receive and process requests concurrently
+- **Advantages**:
+  - Better resource utilization (all servers work)
+  - Higher total capacity (combined capacity of all servers)
+  - Better performance under normal conditions
+- **Disadvantages**:
+  - More complex configuration
+  - Requires session synchronization for stateful applications
+  - Higher infrastructure costs (all servers must be adequately provisioned)
+
+### Alternative: Active-Passive Setup
+
+**Active-Passive Setup**:
+- **Definition**: Only one server (active) handles traffic; others (passive) remain on standby
+- **Behavior**: Passive servers only activate when the active server fails
+- **Advantages**:
+  - Simpler configuration
+  - Clear failover mechanism
+  - Lower operational complexity
+- **Disadvantages**:
+  - Wasted resources (passive servers idle)
+  - Lower total capacity
+  - Failover delay when switching servers
+
+---
+
+## Database Primary-Replica (Master-Slave) Cluster
+
+### How It Works
+
+**Replication Process**:
+1. **Write Operations**: All write operations (INSERT, UPDATE, DELETE) go to the Primary node
+2. **Binary Log**: Primary records all changes in a binary log
+3. **Log Transfer**: Replica node(s) continuously pull the binary log from Primary
+4. **Replay Changes**: Replica replays the changes to stay synchronized
+5. **Read Operations**: Applications can read from both Primary and Replica
+
+**Synchronization**:
+- **Asynchronous Replication** (typical): Primary doesn't wait for Replica to confirm
+- **Semi-synchronous Replication**: Primary waits for at least one Replica to acknowledge
+- **Synchronous Replication**: Primary waits for all Replicas (rare, impacts performance)
+
+### Primary Node vs Replica Node
+
+#### Primary Node (Master)
+**Role**:
+- Handles all **write** operations (INSERT, UPDATE, DELETE)
+- Handles **read** operations
+- Source of truth for all data
+- Manages the binary log for replication
+
+**Capabilities**:
+- Full read/write access
+- Accepts data modifications
+- Authoritative source
+
+**Application Interaction**:
+- All writes must go to Primary
+- Critical reads can go to Primary for guaranteed consistency
+- Primary is the single point of truth
+
+#### Replica Node (Slave)
+**Role**:
+- Handles **read-only** operations (SELECT)
+- Receives and applies changes from Primary
+- Provides read scalability
+- Serves as backup/disaster recovery
+
+**Capabilities**:
+- Read-only access (by configuration, can be writable but shouldn't be)
+- Cannot accept writes directly from applications
+- Data may be slightly behind Primary (replication lag)
+
+**Application Interaction**:
+- Applications read from Replica to offload Primary
+- Good for non-critical reads, reports, analytics
+- May have slight data lag (eventual consistency)
+
+**Replication Lag**:
+Replica might be slightly behind Primary (milliseconds to seconds) depending on:
+- Network latency
+- Replica hardware capacity
+- Write volume on Primary
+
+---
+
+## Infrastructure Issues
+
+### 1. Single Points of Failure (SPOF)
+
+Despite improvements, this infrastructure still has SPOFs:
+
+**Load Balancer SPOF**:
+- If HAProxy fails, no traffic reaches the servers
+- The entire website becomes unavailable
+- **Solution**: Add a second load balancer with failover (not implemented here)
+
+**Primary Database SPOF**:
+- All writes go to the Primary node
+- If Primary fails, the application cannot write data
+- Replica is read-only and cannot automatically become Primary without manual intervention
+- **Solution**: Implement automatic failover or use multi-primary setup
+
+**Network SPOF**:
+- Single network connection or switch failure affects all servers
+- **Solution**: Redundant network paths and switches
+
+### 2. Security Issues
+
+**No Firewall**:
+- Servers are exposed directly to the internet
+- No filtering of malicious traffic
+- Vulnerable to attacks (port scanning, exploitation attempts)
+- No network segmentation
+- **Risk**: Unauthorized access, data breaches, DDoS attacks
+
+**No HTTPS**:
+- Traffic between users and servers is unencrypted (HTTP only)
+- Passwords, personal data, and session cookies transmitted in plain text
+- Vulnerable to man-in-the-middle (MITM) attacks
+- No authentication of server identity
+- **Risk**: Data interception, credential theft, session hijacking
+- **Compliance**: Violates regulations (GDPR, PCI DSS for payment data)
+
+### 3. No Monitoring
+
+**Lack of Visibility**:
+- No way to detect server failures or performance issues
+- Cannot track traffic patterns or user behavior
+- No alerting for problems
+- Cannot measure uptime or performance metrics
+
+**Cannot Detect**:
+- Server health (CPU, RAM, disk usage)
+- Application errors or crashes
+- Database performance issues
+- Traffic spikes or DDoS attacks
+- Security incidents
+
+**No Metrics**:
+- Response times
+- Error rates
+- Uptime/downtime
+- Resource utilization
+- User traffic patterns
+
+**Impact**:
+- Problems discovered by users instead of proactive detection
+- Longer resolution times (no data for troubleshooting)
+- Cannot optimize performance without metrics
+- No capacity planning data
+
+---
+
+## Summary
+
+This distributed infrastructure improves upon the simple stack by adding:
+- Load balancing for better traffic distribution
+- Server redundancy for improved availability
+- Database replication for read scalability
+
+However, it still requires:
+- Additional load balancer redundancy
+- Firewall implementation
+- HTTPS/SSL encryption
+- Comprehensive monitoring system
+- Automatic database failover
+
+This setup is suitable for small to medium production applications but needs security and monitoring enhancements for enterprise use.

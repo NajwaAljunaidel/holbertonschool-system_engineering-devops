@@ -1,0 +1,125 @@
+# Simple Web Stack
+
+## Infrastructure Diagram
+
+```mermaid
+flowchart TB
+    User([User])
+    Internet((Internet))
+    DNS[DNS Server<br/>foobar.com<br/>www → 8.8.8.8]
+
+    subgraph Server["Server (8.8.8.8)"]
+        Web[Web Server<br/>Nginx]
+        App[Application Server]
+        Code[Application Files<br/>Code Base]
+        DB[(Database<br/>MySQL)]
+
+        Web --> App
+        App --> Code
+        App --> DB
+    end
+
+    User -->|1. Types www.foobar.com| Internet
+    Internet -->|2. DNS Query| DNS
+    DNS -->|3. Returns 8.8.8.8| Internet
+    Internet -->|4. HTTP/HTTPS Request| Web
+    Web -->|5. Process Request| App
+    App -->|6. Query Data| DB
+    DB -->|7. Return Data| App
+    App -->|8. Generate Response| Web
+    Web -->|9. HTTP Response| Internet
+    Internet -->|10. Display Website| User
+```
+
+## Image URL
+[You can upload a screenshot of the above diagram to imgur and paste the link here]
+
+---
+
+## Infrastructure Components Explanation
+
+### What is a server?
+A server is a physical or virtual computer system that provides resources, data, services, or programs to other computers (clients) over a network. In this infrastructure, the server (IP: 8.8.8.8) hosts all the components needed to run the website: the web server software, application server, application code, and database.
+
+### What is the role of the domain name?
+The domain name (foobar.com) serves as a human-readable address for the website, replacing the need to remember the IP address (8.8.8.8). It acts as a user-friendly alias that gets translated to the server's IP address through DNS resolution. Domain names make websites accessible and memorable for users.
+
+### What type of DNS record is "www" in www.foobar.com?
+The "www" in www.foobar.com is an **A record** (Address Record). An A record maps a domain name to an IPv4 address. In this case, it maps www.foobar.com to 8.8.8.8. This is the most common type of DNS record used to point domain names to server IP addresses.
+
+### What is the role of the web server?
+The web server (Nginx) is responsible for:
+- Receiving HTTP/HTTPS requests from users' browsers
+- Serving static content (HTML, CSS, JavaScript, images) directly
+- Forwarding dynamic requests to the application server
+- Handling SSL/TLS encryption for HTTPS connections
+- Managing concurrent connections efficiently
+- Returning HTTP responses to clients
+
+### What is the role of the application server?
+The application server executes the business logic of the website. Its responsibilities include:
+- Processing dynamic content requests received from the web server
+- Running the application code (written in languages like Python, PHP, Ruby, Node.js, etc.)
+- Interacting with the database to retrieve or store data
+- Performing calculations, data processing, and business logic
+- Generating dynamic HTML or API responses
+- Managing application sessions and state
+
+### What is the role of the database?
+The database (MySQL) is responsible for:
+- Storing persistent data (user information, content, transactions, etc.)
+- Managing data organization and relationships
+- Providing efficient data retrieval through queries
+- Ensuring data integrity and consistency
+- Supporting ACID transactions (Atomicity, Consistency, Isolation, Durability)
+- Allowing the application to create, read, update, and delete (CRUD) data
+
+### What is the server using to communicate with the user's computer?
+The server communicates with the user's computer using the **HTTP** (HyperText Transfer Protocol) or **HTTPS** (HTTP Secure) protocol over **TCP/IP** (Transmission Control Protocol/Internet Protocol).
+
+The communication flow:
+1. **Application Layer**: HTTP/HTTPS protocol for web communication
+2. **Transport Layer**: TCP protocol ensures reliable data delivery
+3. **Network Layer**: IP protocol handles routing and addressing
+4. **Physical Layer**: Internet infrastructure (cables, routers, switches)
+
+---
+
+## Infrastructure Issues
+
+### 1. SPOF (Single Point of Failure)
+This infrastructure has multiple single points of failure:
+- **Single Server**: If the server fails (hardware failure, power outage, network issues), the entire website becomes unavailable.
+- **Single Database**: If the database crashes or becomes corrupted, all data access fails.
+- **Single Network Connection**: If the network connection to the server fails, the site is unreachable.
+- **No Redundancy**: There are no backup systems to take over if any component fails.
+
+**Impact**: Any failure results in complete service outage, leading to loss of revenue, users, and reputation.
+
+### 2. Downtime When Maintenance Needed
+Whenever maintenance is required, the website experiences downtime:
+- **Code Deployment**: Deploying new application code typically requires restarting the application server, causing downtime.
+- **Web Server Restart**: Configuration changes to Nginx require a restart, interrupting all active connections.
+- **Database Updates**: Database schema changes, backups, or maintenance require taking the database offline.
+- **Server Updates**: Operating system updates, security patches, or software upgrades require server reboots.
+
+**Impact**: Planned maintenance windows result in service unavailability, frustrating users and potentially losing business during peak hours.
+
+### 3. Cannot Scale if Too Much Incoming Traffic
+This single-server infrastructure cannot handle traffic spikes:
+- **Limited Resources**: A single server has finite CPU, RAM, and bandwidth. High traffic overwhelms these resources.
+- **No Load Distribution**: All requests hit one server, creating a bottleneck.
+- **Performance Degradation**: As traffic increases, response times slow down, and eventually, the server may crash or become unresponsive.
+- **No Horizontal Scaling**: Cannot add more servers to distribute the load.
+
+**Impact**: During traffic spikes (viral content, marketing campaigns, DDoS attacks), the website becomes slow or completely unavailable, resulting in poor user experience and lost opportunities.
+
+---
+
+## Summary
+This simple web stack provides a basic functional website but lacks reliability, availability, and scalability. It's suitable only for:
+- Development and testing environments
+- Low-traffic personal projects
+- Proof-of-concept applications
+
+For production environments with real users, a more robust infrastructure with redundancy, load balancing, and scalability is essential.

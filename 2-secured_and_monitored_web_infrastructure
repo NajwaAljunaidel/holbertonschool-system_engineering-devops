@@ -1,0 +1,493 @@
+# Secured and Monitored Web Infrastructure
+
+## Infrastructure Diagram
+
+```mermaid
+flowchart TB
+    User([User])
+    Internet((Internet))
+
+    subgraph SecurityLayer["Security & Monitoring Layer"]
+        SSL[SSL Certificate<br/>HTTPS Encryption<br/>www.foobar.com]
+        LB[Load Balancer<br/>HAProxy<br/>SSL Termination]
+        FW1[Firewall 1]
+    end
+
+    subgraph Server1["Server 1"]
+        FW2[Firewall 2]
+        Web1[Web Server<br/>Nginx]
+        App1[Application Server]
+        Code1[Application Files]
+        Mon1[Monitoring Client<br/>Sumologic Agent]
+
+        FW2 --> Web1
+        Web1 --> App1
+        App1 --> Code1
+        Mon1 -.->|Collect Metrics| Web1
+        Mon1 -.->|Collect Metrics| App1
+    end
+
+    subgraph Server2["Server 2"]
+        FW3[Firewall 3]
+        Web2[Web Server<br/>Nginx]
+        App2[Application Server]
+        Code2[Application Files]
+        Mon2[Monitoring Client<br/>Sumologic Agent]
+
+        FW3 --> Web2
+        Web2 --> App2
+        App2 --> Code2
+        Mon2 -.->|Collect Metrics| Web2
+        Mon2 -.->|Collect Metrics| App2
+    end
+
+    subgraph Server3["Server 3"]
+        FW4[Firewall 4]
+        Web3[Web Server<br/>Nginx]
+        App3[Application Server]
+        Code3[Application Files]
+        DBPrimary[(Primary Database<br/>MySQL)]
+        Mon3[Monitoring Client<br/>Sumologic Agent]
+
+        FW4 --> Web3
+        Web3 --> App3
+        App3 --> Code3
+        App3 --> DBPrimary
+        Mon3 -.->|Collect Metrics| Web3
+        Mon3 -.->|Collect Metrics| DBPrimary
+    end
+
+    MonService[Monitoring Service<br/>Sumologic Dashboard]
+
+    User -->|1. HTTPS Request| Internet
+    Internet -->|2. Encrypted Traffic| SSL
+    SSL --> LB
+    LB --> FW1
+    FW1 -->|3. Filtered Traffic| FW2
+    FW1 -->|3. Filtered Traffic| FW3
+    FW1 -->|3. Filtered Traffic| FW4
+
+    Mon1 -.->|Send Data| MonService
+    Mon2 -.->|Send Data| MonService
+    Mon3 -.->|Send Data| MonService
+```
+
+## Image URL
+[You can upload a screenshot of the above diagram to imgur and paste the link here]
+
+---
+
+## Why Are We Adding Each Element?
+
+### 1. Three Firewalls
+**Why added**: To provide network security and access control at multiple levels:
+- **Firewall 1 (Edge Firewall)**: Protects the load balancer and filters incoming traffic from the internet
+- **Firewalls 2, 3, 4 (Server Firewalls)**: Individual protection for each server, implementing defense in depth
+- **Security Benefits**:
+  - Filter malicious traffic before it reaches application servers
+  - Block unauthorized access attempts
+  - Prevent common attacks (port scanning, DDoS, SQL injection attempts)
+  - Control which ports and protocols are accessible
+  - Enable network segmentation and isolation
+
+### 2. SSL Certificate (HTTPS)
+**Why added**: To encrypt traffic and secure communication:
+- **Data Protection**: Encrypts all data transmitted between users and servers
+- **Privacy**: Prevents eavesdropping on sensitive information (passwords, personal data, payment info)
+- **Authentication**: Verifies the website's identity to users
+- **Trust**: Browsers show padlock icon, increasing user confidence
+- **Compliance**: Required for regulations (PCI DSS, GDPR, HIPAA)
+- **SEO**: Search engines rank HTTPS sites higher
+
+### 3. Three Monitoring Clients
+**Why added**: To provide visibility into infrastructure health and performance:
+- **Real-time Monitoring**: Track server health, performance, and availability 24/7
+- **Proactive Alerts**: Detect and notify about issues before users are affected
+- **Performance Metrics**: Measure response times, throughput, error rates
+- **Capacity Planning**: Understand usage patterns for scaling decisions
+- **Troubleshooting**: Collect logs and metrics for debugging issues
+- **Security**: Detect suspicious activity and potential security breaches
+- **Compliance**: Maintain audit trails for regulatory requirements
+
+**One monitoring client per server ensures**:
+- Comprehensive coverage of all infrastructure components
+- No blind spots in monitoring
+- Granular visibility into individual server performance
+
+---
+
+## Security Components Explained
+
+### What Are Firewalls For?
+
+**Purpose**: Firewalls are network security systems that monitor and control incoming and outgoing network traffic based on predetermined security rules.
+
+**Functions**:
+1. **Traffic Filtering**: Block or allow traffic based on:
+   - Source/destination IP addresses
+   - Port numbers
+   - Protocols (TCP, UDP, ICMP)
+   - Application-level data
+
+2. **Access Control**:
+   - Restrict access to specific services
+   - Implement allowlist/blocklist policies
+   - Control internal network segmentation
+
+3. **Threat Prevention**:
+   - Block known malicious IP addresses
+   - Prevent port scanning
+   - Mitigate DDoS attacks
+   - Filter malformed packets
+
+4. **Logging and Auditing**:
+   - Record all traffic attempts
+   - Provide security audit trails
+   - Enable forensic analysis
+
+**Example Rules**:
+- Allow HTTPS (port 443) from anywhere
+- Allow HTTP (port 80) from anywhere
+- Allow SSH (port 22) only from specific admin IPs
+- Block all other incoming traffic
+- Allow all outgoing traffic from servers
+
+### Why Is Traffic Served Over HTTPS?
+
+**HTTPS (HTTP Secure) = HTTP + TLS/SSL Encryption**
+
+**Reasons to Use HTTPS**:
+
+1. **Encryption**:
+   - All data encrypted in transit
+   - Prevents interception of sensitive information
+   - Protects against man-in-the-middle (MITM) attacks
+
+2. **Data Integrity**:
+   - Ensures data isn't modified during transmission
+   - Detects tampering attempts
+   - Guarantees content hasn't been altered
+
+3. **Authentication**:
+   - SSL certificate verifies server identity
+   - Users know they're connecting to the legitimate website
+   - Prevents impersonation attacks
+
+4. **Privacy**:
+   - Conceals URLs, query parameters, and headers
+   - Protects user browsing behavior
+   - Prevents ISPs from injecting content
+
+5. **Trust**:
+   - Browsers show security indicators (padlock icon)
+   - Builds user confidence
+   - Required for modern web features (geolocation, camera access)
+
+6. **Compliance**:
+   - Required by PCI DSS for payment processing
+   - GDPR requires protection of personal data
+   - Industry best practice
+
+7. **SEO Benefits**:
+   - Google uses HTTPS as a ranking signal
+   - Better search engine visibility
+
+**What Happens Without HTTPS**:
+- Passwords transmitted in plain text
+- Session cookies can be stolen
+- Credit card numbers visible to attackers
+- Content can be modified by intermediaries
+- Users receive "Not Secure" warnings
+
+---
+
+## Monitoring Explained
+
+### What Is Monitoring Used For?
+
+**Primary Purposes**:
+
+1. **Health Monitoring**:
+   - Server uptime/downtime
+   - Service availability
+   - Resource utilization (CPU, RAM, disk, network)
+
+2. **Performance Tracking**:
+   - Response times
+   - Throughput (requests per second)
+   - Database query performance
+   - Page load times
+
+3. **Error Detection**:
+   - Application errors and crashes
+   - HTTP error rates (4xx, 5xx)
+   - Failed requests
+   - Exception tracking
+
+4. **Security Monitoring**:
+   - Failed login attempts
+   - Unusual traffic patterns
+   - Potential security breaches
+   - Access violations
+
+5. **Capacity Planning**:
+   - Traffic trends
+   - Resource usage patterns
+   - Growth projections
+   - Scaling decisions
+
+6. **Alerting**:
+   - Immediate notification of issues
+   - Threshold-based alerts
+   - Anomaly detection
+   - On-call escalations
+
+7. **Compliance and Auditing**:
+   - Audit trails
+   - Regulatory reporting
+   - SLA verification
+
+### How Is the Monitoring Tool Collecting Data?
+
+**Collection Methods**:
+
+1. **Monitoring Agents/Clients**:
+   - Software installed on each server (Sumologic agent)
+   - Runs continuously in the background
+   - Collects metrics locally and sends to monitoring service
+
+2. **Data Collection Process**:
+   ```
+   Server → Monitoring Agent → Data Aggregation → Monitoring Service → Dashboard/Alerts
+   ```
+
+3. **What Gets Collected**:
+
+   **System Metrics**:
+   - CPU usage percentage
+   - Memory usage and available RAM
+   - Disk space and I/O operations
+   - Network bandwidth and packet counts
+
+   **Application Metrics**:
+   - HTTP request counts
+   - Response times (latency)
+   - Error rates and status codes
+   - Active connections
+
+   **Log Data**:
+   - Application logs
+   - Web server access logs
+   - Error logs
+   - Security logs
+
+   **Database Metrics**:
+   - Query execution times
+   - Connection pool usage
+   - Lock waits
+   - Replication lag
+
+4. **Collection Techniques**:
+   - **Push Model**: Agents actively send data to monitoring service
+   - **Pull Model**: Monitoring service queries agents periodically
+   - **Log Streaming**: Real-time log forwarding
+   - **API Integration**: Direct application instrumentation
+
+5. **Data Flow**:
+   - Agent collects metrics every N seconds (e.g., 10-60 seconds)
+   - Buffers data locally
+   - Sends batches to monitoring service
+   - Monitoring service processes, stores, and visualizes data
+
+### Monitoring Your Web Server QPS (Queries Per Second)
+
+**QPS**: Number of requests the web server handles per second
+
+**How to Monitor Web Server QPS**:
+
+1. **Configure Monitoring Agent**:
+   - Install monitoring client on web server
+   - Configure to track HTTP request metrics
+   - Set up access log parsing
+
+2. **Data Sources**:
+   - **Nginx Access Logs**: Parse logs to count requests
+   - **Nginx Status Module**: Enable `stub_status` or `ngx_http_stub_status_module`
+   - **Application Metrics**: Instrument application to report requests
+
+3. **Sumologic Configuration**:
+   ```
+   - Parse Nginx access logs
+   - Extract timestamp and request information
+   - Aggregate requests per second
+   - Create dashboard visualization
+   - Set up alerts for QPS thresholds
+   ```
+
+4. **Metrics to Track**:
+   - Total QPS (all requests)
+   - QPS by endpoint/URL
+   - QPS by HTTP method (GET, POST, etc.)
+   - QPS by response code (2xx, 4xx, 5xx)
+
+5. **Set Up Alerts**:
+   - Alert when QPS exceeds normal capacity
+   - Alert on sudden QPS drops (potential outage)
+   - Alert on high error rates at certain QPS levels
+
+6. **Dashboard Example**:
+   - Real-time QPS graph
+   - Average QPS over time periods
+   - Peak QPS tracking
+   - QPS by server (in multi-server setup)
+
+**Example Nginx Status Configuration**:
+```nginx
+location /nginx_status {
+    stub_status on;
+    access_log off;
+    allow 127.0.0.1;  # Only allow localhost
+    deny all;
+}
+```
+
+**Example Metrics**:
+- Current QPS: 1,250 requests/second
+- Average QPS (1 hour): 800 requests/second
+- Peak QPS (24 hours): 2,100 requests/second
+
+---
+
+## Infrastructure Issues
+
+### 1. Why Terminating SSL at the Load Balancer Level Is an Issue
+
+**SSL Termination**: The load balancer decrypts HTTPS traffic and forwards unencrypted HTTP to backend servers.
+
+**Problems**:
+
+1. **Internal Traffic Not Encrypted**:
+   - Traffic between load balancer and servers is unencrypted (HTTP)
+   - Vulnerable to internal network attacks
+   - Anyone with access to the internal network can intercept data
+   - No protection if internal network is compromised
+
+2. **Compliance Issues**:
+   - Some regulations require end-to-end encryption
+   - PCI DSS may require encryption throughout the entire network
+   - Audit findings for unencrypted internal traffic
+
+3. **Trust Boundary**:
+   - Assumes internal network is completely secure
+   - Insider threats can access unencrypted data
+   - Compromised internal systems can eavesdrop
+
+4. **Limited Defense in Depth**:
+   - Single layer of encryption (external only)
+   - No protection against internal attackers
+   - Violates security best practice of multiple layers
+
+**Solutions**:
+- **End-to-End Encryption**: Load balancer re-encrypts traffic to backend servers (SSL bridging)
+- **Internal TLS**: Use HTTPS between all components
+- **Network Segmentation**: Strong firewall rules between network zones
+
+### 2. Why Having Only One MySQL Server Capable of Accepting Writes Is an Issue
+
+**Current Setup**: Single Primary database handles all writes; Replicas are read-only.
+
+**Problems**:
+
+1. **Single Point of Failure for Writes**:
+   - If Primary fails, application cannot write data
+   - Website becomes read-only or completely non-functional
+   - No automatic failover for write operations
+
+2. **Write Scalability Limit**:
+   - All write operations bottleneck at single server
+   - Cannot horizontally scale write capacity
+   - Limited by single server's resources (CPU, disk I/O)
+
+3. **Maintenance Downtime**:
+   - Upgrading or maintaining Primary requires write downtime
+   - Cannot perform zero-downtime deployments
+   - Planned maintenance impacts availability
+
+4. **Performance Bottleneck**:
+   - High write load degrades performance for all users
+   - Write contention impacts read performance on Primary
+   - Cannot distribute write load
+
+5. **Limited Disaster Recovery**:
+   - Manual intervention required to promote Replica to Primary
+   - Potential data loss if Primary fails before replication completes
+   - Recovery time impacts business continuity
+
+**Solutions**:
+- **Multi-Primary Replication**: Multiple servers accept writes (complex, requires conflict resolution)
+- **Automatic Failover**: Auto-promote Replica to Primary on failure
+- **Database Clustering**: Solutions like MySQL Cluster, Galera Cluster
+- **Horizontal Partitioning (Sharding)**: Distribute writes across multiple database servers
+
+### 3. Why Having Servers with All the Same Components Might Be a Problem
+
+**Current Setup**: Each server has web server, application server, and database.
+
+**Problems**:
+
+1. **Resource Contention**:
+   - All components compete for same CPU, RAM, and disk I/O
+   - Database queries slow down web server performance
+   - Application processing impacts database performance
+   - Cannot optimize hardware for specific workloads
+
+2. **Inefficient Scaling**:
+   - Must scale all components together even if only one is bottlenecked
+   - Cannot scale database independently from web servers
+   - Wastes resources (e.g., adding web server when only database needs scaling)
+   - Higher infrastructure costs
+
+3. **Security Risks**:
+   - Compromise of web server gives access to database on same machine
+   - No network segmentation between tiers
+   - Larger attack surface (more services exposed per server)
+   - Harder to implement principle of least privilege
+
+4. **Maintenance Complexity**:
+   - Updates to one component require coordinating all components
+   - Restarting database affects web and application services
+   - Cannot perform rolling updates by tier
+   - Higher risk during deployments
+
+5. **Performance Tuning Conflicts**:
+   - Database optimizations may conflict with web server settings
+   - Cannot tune OS and hardware for specific workloads
+   - Memory allocation conflicts between components
+   - Different I/O patterns interfere
+
+6. **Reliability**:
+   - Failure in one component affects all components on that server
+   - Application crash can destabilize database
+   - No isolation between service tiers
+
+**Solutions**:
+- **Component Separation**: Dedicated servers for web, application, and database tiers
+- **Microservices Architecture**: Further separate application components
+- **Containerization**: Isolate components while sharing hardware
+- **Specialized Hardware**: Optimize servers for specific workloads (SSD for database, high CPU for app servers)
+
+---
+
+## Summary
+
+This secured and monitored infrastructure addresses critical gaps:
+- **Security**: Firewalls and HTTPS protect against attacks and data breaches
+- **Visibility**: Monitoring provides insights into health, performance, and issues
+
+However, improvements still needed:
+- End-to-end encryption (not just SSL termination)
+- Database write redundancy and automatic failover
+- Component separation for better scalability and isolation
+- Load balancer redundancy
+
+This setup is suitable for production environments requiring security and monitoring but should be enhanced for mission-critical applications requiring higher availability and scalability.
